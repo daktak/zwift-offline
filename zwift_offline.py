@@ -2052,23 +2052,15 @@ def random_profile(p):
     return p
 
 def get_ghost_profile(p)
-    orig_profile = 0
-    #set contents of enable_ghosts.txt to 1 to keep riders profile
-    with open(ENABLEGHOSTS_FILE) as f:
-        try:
-            orig_profile = min(int(f.readline().rstrip('\r\n')), 100)
-        except ValueError:
-            pass
-    if orig_profile = 0:
-        ghost_team_file = '%s/ghost_team.txt' % STORAGE_DIR
-        if os.path.isfile(ghost_team_file):
-            riders = []
-            p.CopyFrom(random_profile(p))
-            with open(ghost_team_file) as f:
-                rider = json.load(f)['riders']
-            for item in ['is_male', 'country_code', 'ride_jersey', 'bike_frame', 'bike_frame_colour', 'bike_wheel_front', 'bike_wheel_rear', 'ride_helmet_type', 'glasses_type', 'ride_shoes_type', 'ride_socks_type']:
-                if item in rider:
-                    setattr(p, item, rider[item])
+    ghost_team_file = '%s/ghost_team.txt' % STORAGE_DIR
+    if os.path.isfile(ghost_team_file):
+        riders = []
+        p.CopyFrom(random_profile(p))
+        with open(ghost_team_file) as f:
+            rider = json.load(f)['riders']
+        for item in ['is_male', 'country_code', 'ride_jersey', 'bike_frame', 'bike_frame_colour', 'bike_wheel_front', 'bike_wheel_rear', 'ride_helmet_type', 'glasses_type', 'ride_shoes_type', 'ride_socks_type']:
+            if item in rider:
+                setattr(p, item, rider[item])
     return p
 
 @app.route('/api/profiles', methods=['GET'])

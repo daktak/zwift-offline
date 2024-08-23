@@ -2053,9 +2053,9 @@ def random_profile(p):
 
 def get_ghost_profile(p)
     ghost_team_file = '%s/ghost_team.txt' % STORAGE_DIR
+    p.CopyFrom(random_profile(p))
     if os.path.isfile(ghost_team_file):
         riders = []
-        p.CopyFrom(random_profile(p))
         with open(ghost_team_file) as f:
             rider = json.load(f)['riders']
         for item in ['is_male', 'country_code', 'ride_jersey', 'bike_frame', 'bike_frame_colour', 'bike_wheel_front', 'bike_wheel_rear', 'ride_helmet_type', 'glasses_type', 'ride_shoes_type', 'ride_socks_type']:

@@ -2066,7 +2066,7 @@ def get_ghost_profile(p)
             p.CopyFrom(random_profile(p))
             with open(ghost_team_file) as f:
                 rider = json.load(f)['riders']
-            for item in ['first_name', 'last_name', 'is_male', 'country_code', 'ride_jersey', 'bike_frame', 'bike_frame_colour', 'bike_wheel_front', 'bike_wheel_rear', 'ride_helmet_type', 'glasses_type', 'ride_shoes_type', 'ride_socks_type']:
+            for item in ['is_male', 'country_code', 'ride_jersey', 'bike_frame', 'bike_frame_colour', 'bike_wheel_front', 'bike_wheel_rear', 'ride_helmet_type', 'glasses_type', 'ride_shoes_type', 'ride_socks_type']:
                 if item in rider:
                     setattr(p, item, rider[item])
     return p

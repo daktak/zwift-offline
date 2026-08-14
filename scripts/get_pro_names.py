@@ -16,6 +16,7 @@ import argparse
 import os
 import sys
 import xml.etree.ElementTree as ET
+import unicodedata
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
@@ -91,6 +92,12 @@ def normalize_team(name):
     return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
 
+def strip_accents(s):
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
+    )
+
+
 TEAM_INDEX = {normalize_team(k): k for k in teams}
 
 TEAM_PAGE_CACHE = {}
@@ -149,13 +156,15 @@ def match_team(raw, href=None, use_teampage=False, threshold=MATCH_THRESHOLD):
 
 
 def fuzzy_jersey(raw_team, tmp):
+    q = strip_accents(raw_team).lower()
+    norm_jerseys = {strip_accents(k).lower(): k for k in jerseys}
     best_match = process.extractOne(
-        raw_team, list(jerseys.keys()), scorer=fuzz.token_set_ratio
+        q, list(norm_jerseys.keys()), scorer=fuzz.token_set_ratio
     )
     print(
         "%s %s : %s - %s" % (tmp["first_name"], tmp["last_name"], raw_team, best_match)
     )
-    return jerseys[best_match[0]]
+    return jerseys[norm_jerseys[best_match[0]]]
 
 
 def get_pros(
@@ -256,6 +265,8 @@ helmets = {}
 shoes = {}
 paintjobs = {}
 for x in tree.findall("./BIKEFRAMES/BIKEFRAME"):
+    if x.get("isTT") == "1":
+        continue
     bikes[x.get("name")] = int(x.get("signature"))
     bikes_class[x.get("name")] = x.get("bikeClass")
 for x in tree.findall("./BIKEFRONTWHEELS/BIKEFRONTWHEEL"):
@@ -287,9 +298,11 @@ def derive_abv(name):
 def best_match(query, choices):
     if not query or not choices:
         return None, 0
-    best = process.extractOne(query, list(choices.keys()), scorer=fuzz.token_set_ratio)
+    q = strip_accents(query).lower()
+    norm_choices = {strip_accents(k).lower(): k for k in choices}
+    best = process.extractOne(q, list(norm_choices.keys()), scorer=fuzz.token_set_ratio)
     if best:
-        return best[0], best[1]
+        return norm_choices[best[0]], best[1]
     return None, 0
 
 
@@ -299,14 +312,21 @@ BIKE_PRIORITY = {"HIGH_END": 0, "MID_RANGE": 1, "ENTRY": 2, "CONCEPT": 3}
 def best_bike(query):
     if not query:
         return None, 0
+    q = strip_accents(query).lower()
+    norm_bikes = {strip_accents(k).lower(): k for k in bikes}
     cands = process.extract(
-        query, list(bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
+        q, list(norm_bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
     )
     cands = [c for c in cands if c[1] >= MATCH_THRESHOLD]
     if not cands:
         return None, 0
-    cands.sort(key=lambda c: (BIKE_PRIORITY.get(bikes_class.get(c[0], ""), 9), -c[1]))
-    return cands[0][0], cands[0][1]
+    cands.sort(
+        key=lambda c: (
+            BIKE_PRIORITY.get(bikes_class.get(norm_bikes[c[0]], ""), 9),
+            -c[1],
+        )
+    )
+    return norm_bikes[cands[0][0]], cands[0][1]
 
 
 def resolve_paintjob(team_name, bike_brand):

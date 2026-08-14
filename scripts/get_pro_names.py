@@ -249,6 +249,7 @@ for x in tree.findall("./JERSEYS/JERSEY"):
     jerseys[x.get("name")] = int(x.get("signature"))
 
 bikes = {}
+bikes_class = {}
 front_wheels = {}
 rear_wheels = {}
 helmets = {}
@@ -256,6 +257,7 @@ shoes = {}
 paintjobs = {}
 for x in tree.findall("./BIKEFRAMES/BIKEFRAME"):
     bikes[x.get("name")] = int(x.get("signature"))
+    bikes_class[x.get("name")] = x.get("bikeClass")
 for x in tree.findall("./BIKEFRONTWHEELS/BIKEFRONTWHEEL"):
     front_wheels[x.get("name")] = int(x.get("signature"))
 for x in tree.findall("./BIKEREARWHEELS/BIKEREARWHEEL"):
@@ -275,6 +277,22 @@ def best_match(query, choices):
     if best:
         return best[0], best[1]
     return None, 0
+
+
+BIKE_PRIORITY = {"HIGH_END": 0, "MID_RANGE": 1, "ENTRY": 2, "CONCEPT": 3}
+
+
+def best_bike(query):
+    if not query:
+        return None, 0
+    cands = process.extract(
+        query, list(bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
+    )
+    cands = [c for c in cands if c[1] >= MATCH_THRESHOLD]
+    if not cands:
+        return None, 0
+    cands.sort(key=lambda c: (BIKE_PRIORITY.get(bikes_class.get(c[0], ""), 9), -c[1]))
+    return cands[0][0], cands[0][1]
 
 
 def resolve_paintjob(team_name, bike_brand):
@@ -385,22 +403,13 @@ def generate_teams(limit):
             print("PAINTJOB: %r -> %r (model %r)" % (team_name, pjname, model))
             entry["bike_frame_colour_name"] = pjname
             entry["bike_frame_colour_signature"] = pjsig
-            if model:
-                bname, bscore = best_match(model, bikes)
-                if bname and bscore >= MATCH_THRESHOLD:
-                    print("BIKE (paintjob model): %r -> %r" % (model, bname))
-                    entry["bike_name"] = bname
-                    entry["bike_signature"] = bikes[bname]
-                else:
-                    entry["bike_name"] = model
-                    entry["bike_signature"] = bikes.get(model, 0)
         else:
             if pjname:
                 print(
                     "PAINTJOB (brand mismatch, ignored): %r -> %r" % (team_name, pjname)
                 )
             if brand:
-                bname, bscore = best_match(brand, bikes)
+                bname, bscore = best_bike(brand)
                 if bname and bscore >= MATCH_THRESHOLD:
                     print("FUZZY BIKE: %r -> %r (score %d)" % (brand, bname, bscore))
                     entry["bike_name"] = bname

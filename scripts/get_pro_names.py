@@ -298,9 +298,19 @@ def derive_abv(name):
 def best_match(query, choices):
     if not query or not choices:
         return None, 0
-    q = strip_accents(query).lower()
     norm_choices = {strip_accents(k).lower(): k for k in choices}
-    best = process.extractOne(q, list(norm_choices.keys()), scorer=fuzz.token_set_ratio)
+    best = None
+    best_score = 0
+    for q in (
+        strip_accents(query).lower(),
+        strip_accents(query).lower().replace(" ", ""),
+    ):
+        m = process.extractOne(
+            q, list(norm_choices.keys()), scorer=fuzz.token_set_ratio
+        )
+        if m and m[1] > best_score:
+            best = m
+            best_score = m[1]
     if best:
         return norm_choices[best[0]], best[1]
     return None, 0
@@ -312,21 +322,32 @@ BIKE_PRIORITY = {"HIGH_END": 0, "MID_RANGE": 1, "ENTRY": 2, "CONCEPT": 3}
 def best_bike(query):
     if not query:
         return None, 0
-    q = strip_accents(query).lower()
     norm_bikes = {strip_accents(k).lower(): k for k in bikes}
-    cands = process.extract(
-        q, list(norm_bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
-    )
-    cands = [c for c in cands if c[1] >= MATCH_THRESHOLD]
-    if not cands:
-        return None, 0
-    cands.sort(
-        key=lambda c: (
-            BIKE_PRIORITY.get(bikes_class.get(norm_bikes[c[0]], ""), 9),
-            -c[1],
+    best = None
+    best_score = 0
+    for q in (
+        strip_accents(query).lower(),
+        strip_accents(query).lower().replace(" ", ""),
+    ):
+        cands = process.extract(
+            q, list(norm_bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
         )
-    )
-    return norm_bikes[cands[0][0]], cands[0][1]
+        cands = [c for c in cands if c[1] >= MATCH_THRESHOLD]
+        if not cands:
+            continue
+        cands.sort(
+            key=lambda c: (
+                BIKE_PRIORITY.get(bikes_class.get(norm_bikes[c[0]], ""), 9),
+                -c[1],
+            )
+        )
+        c = cands[0]
+        if c[1] > best_score:
+            best = c
+            best_score = c[1]
+    if best:
+        return norm_bikes[best[0]], best[1]
+    return None, 0
 
 
 def resolve_paintjob(team_name, bike_brand):
@@ -380,14 +401,15 @@ def parse_gear(team_href):
 
 def fetch_team_rankings(limit):
     pages = [
-        "https://www.procyclingstats.com/rankings/teams",
-        "https://www.procyclingstats.com/rankings/we/teams",
+        ("https://www.procyclingstats.com/rankings/teams", False),
+        ("https://www.procyclingstats.com/rankings/we/teams", True),
     ]
     found = []
     seen = set()
-    for base in pages:
+    for base, is_women in pages:
         offset = 0
-        while len(found) < limit:
+        page_count = 0
+        while page_count < limit:
             url = base if offset == 0 else "%s&offset=%d" % (base, offset)
             try:
                 soup = BeautifulSoup(fetch_html(url), "html.parser")
@@ -405,19 +427,20 @@ def fetch_team_rankings(limit):
                 if not name:
                     continue
                 seen.add(href)
-                found.append((name, href))
+                found.append((name, href, is_women))
                 got = True
-                if len(found) >= limit:
+                page_count += 1
+                if page_count >= limit:
                     break
             if not got:
                 break
             offset += 100
-    return found[:limit]
+    return found
 
 
 def generate_teams(limit):
     results = {}
-    for team_name, href in fetch_team_rankings(limit):
+    for team_name, href, is_women in fetch_team_rankings(limit):
         entry = {}
         abv = derive_abv(team_name)
         if abv:
@@ -425,6 +448,9 @@ def generate_teams(limit):
         jname, jscore = best_match(team_name, jerseys)
         if jname and jscore >= MATCH_THRESHOLD:
             print("JERSEY: %r -> %r (score %d)" % (team_name, jname, jscore))
+            if is_women:
+                entry["womens_jersey_name"] = jname
+                entry["womens_jersey_signature"] = jerseys[jname]
             entry["jersey_name"] = jname
             entry["jersey_signature"] = jerseys[jname]
         else:

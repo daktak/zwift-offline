@@ -2,7 +2,7 @@
 
 # Use this script to populate bot.txt with names from https://www.procyclingstats.com
 # Refer to http://cdn.zwift.com/gameassets/GameDictionary.xml
-# pip install beautifulsoup4 country-converter fuzzywuzzy
+# pip install beautifulsoup4 country-converter fuzzywuzzy curl_cffi
 # scripts/get_pro_names.py -h
 
 
@@ -18,6 +18,28 @@ import sys
 import xml.etree.ElementTree as ET
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
+
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def fetch_html(url):
+    try:
+        from curl_cffi.requests import Session
+
+        resp = Session(impersonate="chrome").get(
+            url, headers=BROWSER_HEADERS, timeout=30
+        )
+        if resp.status_code != 200:
+            print("FETCH WARNING: %s returned HTTP %d" % (url, resp.status_code))
+        return resp.content
+    except ImportError:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        return urllib.request.urlopen(req).read()
+
 
 base_url = "https://www.procyclingstats.com/rankings.php?filter=Filter"
 cc = coco.CountryConverter()
@@ -540,6 +562,10 @@ teams = {
 # 2026 season team-name aliases (procyclingstats display names)
 teams["Netcompany INEOS"] = teams["INEOS Grenadiers"]
 teams["Lotto Intermarché"] = teams["Intermarché - Wanty"]
+teams["Fenix-Premier Tech"] = teams["Fenix-Deceuninck"]
+teams["FDJ United - SUEZ"] = teams["FDJ - SUEZ"]
+teams["UAE Team L'IMAD"] = teams["UAE Development Team"]
+teams["VolkerWessels Cycling Team"] = {"abv": "VWC"}
 
 MATCH_THRESHOLD = 85
 
@@ -562,8 +588,7 @@ def fetch_team_name(href):
         else "https://www.procyclingstats.com/" + href.lstrip("/")
     )
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        page = BeautifulSoup(urllib.request.urlopen(req).read(), "html.parser")
+        page = BeautifulSoup(fetch_html(url), "html.parser")
         name = ""
         if page.title and page.title.string:
             name = page.title.string.split("|")[0].strip()
@@ -628,8 +653,7 @@ def get_pros(
     data = []
     seen = set()
 
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    site = urllib.request.urlopen(req).read()
+    site = fetch_html(url)
     soup = BeautifulSoup(site, "html.parser")
 
     tmp = {}

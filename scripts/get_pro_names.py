@@ -270,6 +270,20 @@ for x in tree.findall("./PAINTJOBS/PAINTJOB"):
     paintjobs[x.get("name")] = int(x.get("signature"))
 
 
+def derive_abv(name):
+    caps = [
+        w.upper()
+        for w in name.split()
+        if w.isupper() and w.isalpha() and 1 < len(w) <= 4
+    ]
+    if caps:
+        return "".join(caps)[:4]
+    words = [w for w in normalize_team(name).split() if w not in TEAM_STOPWORDS]
+    if not words:
+        return ""
+    return "".join(w[0] for w in words).upper()[:3]
+
+
 def best_match(query, choices):
     if not query or not choices:
         return None, 0
@@ -385,6 +399,9 @@ def generate_teams(limit):
     results = {}
     for team_name, href in fetch_team_rankings(limit):
         entry = {}
+        abv = derive_abv(team_name)
+        if abv:
+            entry["abv"] = abv
         jname, jscore = best_match(team_name, jerseys)
         if jname and jscore >= MATCH_THRESHOLD:
             print("JERSEY: %r -> %r (score %d)" % (team_name, jname, jscore))

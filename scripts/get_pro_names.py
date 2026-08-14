@@ -88,6 +88,9 @@ TEAM_STOPWORDS = {
 }
 
 
+GEAR_STOPWORDS = {"wheels"}
+
+
 def normalize_team(name):
     return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
@@ -301,10 +304,10 @@ def best_match(query, choices):
     norm_choices = {strip_accents(k).lower(): k for k in choices}
     best = None
     best_score = 0
-    for q in (
-        strip_accents(query).lower(),
-        strip_accents(query).lower().replace(" ", ""),
-    ):
+    qbase = " ".join(
+        w for w in strip_accents(query).lower().split() if w not in GEAR_STOPWORDS
+    )
+    for q in (qbase, qbase.replace(" ", "")):
         m = process.extractOne(
             q, list(norm_choices.keys()), scorer=fuzz.token_set_ratio
         )
@@ -325,10 +328,10 @@ def best_bike(query):
     norm_bikes = {strip_accents(k).lower(): k for k in bikes}
     best = None
     best_score = 0
-    for q in (
-        strip_accents(query).lower(),
-        strip_accents(query).lower().replace(" ", ""),
-    ):
+    qbase = " ".join(
+        w for w in strip_accents(query).lower().split() if w not in GEAR_STOPWORDS
+    )
+    for q in (qbase, qbase.replace(" ", "")):
         cands = process.extract(
             q, list(norm_bikes.keys()), scorer=fuzz.token_set_ratio, limit=10
         )

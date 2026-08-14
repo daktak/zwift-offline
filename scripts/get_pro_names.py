@@ -127,6 +127,32 @@ def fetch_team_name(href):
         return None
 
 
+TEAM_CODE_CACHE = {}
+
+
+def fetch_team_code(href):
+    if href in TEAM_CODE_CACHE:
+        return TEAM_CODE_CACHE[href]
+    url = (
+        href
+        if href.startswith("http")
+        else "https://www.procyclingstats.com/" + href.lstrip("/")
+    )
+    code = ""
+    try:
+        page = BeautifulSoup(fetch_html(url), "html.parser")
+        for title in page.select("div.title"):
+            if "Abbreviation" in title.get_text():
+                val = title.find_next_sibling("div")
+                if val:
+                    code = val.get_text(strip=True)
+                break
+    except Exception as e:
+        print("TEAMCODE FETCH FAILED: %s (%s)" % (url, e))
+    TEAM_CODE_CACHE[href] = code
+    return code
+
+
 def match_team(raw, href=None, use_teampage=False, threshold=MATCH_THRESHOLD):
     norm = normalize_team(raw)
     if norm in TEAM_INDEX:
@@ -445,7 +471,7 @@ def generate_teams(limit):
     results = {}
     for team_name, href, is_women in fetch_team_rankings(limit):
         entry = {}
-        abv = derive_abv(team_name)
+        abv = fetch_team_code(href)
         if abv:
             entry["abv"] = abv
         jname, jscore = best_match(team_name, jerseys)

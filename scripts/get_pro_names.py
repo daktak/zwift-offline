@@ -26,548 +26,65 @@ BROWSER_HEADERS = {
 }
 
 
+_SESSION = None
+
+
 def fetch_html(url):
-    try:
+    global _SESSION
+    if _SESSION is None:
         from curl_cffi.requests import Session
 
-        resp = Session(impersonate="chrome").get(
-            url, headers=BROWSER_HEADERS, timeout=30
-        )
-        if resp.status_code != 200:
-            print("FETCH WARNING: %s returned HTTP %d" % (url, resp.status_code))
-        return resp.content
-    except ImportError:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        return urllib.request.urlopen(req).read()
+        _SESSION = Session(impersonate="chrome")
+        try:
+            _SESSION.get(
+                "https://www.procyclingstats.com/",
+                headers=BROWSER_HEADERS,
+                timeout=30,
+            )
+        except Exception as e:
+            print("SESSION WARM FAILED: %s" % e)
+    resp = _SESSION.get(url, headers=BROWSER_HEADERS, timeout=30)
+    if resp.status_code != 200 or b"cf-mitigated" in resp.content:
+        try:
+            resp = _SESSION.get(url, headers=BROWSER_HEADERS, timeout=30)
+        except Exception as e:
+            print("FETCH RETRY FAILED: %s (%s)" % (url, e))
+    if resp.status_code != 200:
+        print("FETCH WARNING: %s returned HTTP %d" % (url, resp.status_code))
+    return resp.content
 
 
 base_url = "https://www.procyclingstats.com/rankings.php?filter=Filter"
 cc = coco.CountryConverter()
 
-teams = {
-    "UAE Team Emirates - XRG": {
-        "abv": "UAD",
-        "jersey_name": "UAE",
-        "jersey_signature": 1751349769,
-        "bike_name": "Colnago V3RS",
-        "bike_signature": 3628259811,
-        "front_wheel_name": "Enve SES 3.4",
-        "front_wheel_signature": 2223270801,
-        "rear_wheel_name": "Enve SES 3.4",
-        "rear_wheel_signature": 3835575171,
-    },
-    "Soudal Quick-Step": {
-        "abv": "SOQ",
-        "jersey_name": "Deceuninck-Quick-Step",
-        "jersey_signature": 2906189156,
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-        "front_wheel_name": "Roval Rapide CLX",
-        "front_wheel_signature": 2181416413,
-        "rear_wheel_name": "Roval Rapide CLX",
-        "rear_wheel_signature": 3548735686,
-        "helmet_name": "S-Works Evade",
-        "helmet_signature": 3109903878,
-    },
-    "Team Visma | Lease a Bike": {
-        "abv": "TVL",
-        "jersey_name": "Jumbo Visma TdF Edition 2023",
-        "jersey_signature": 2246416303,
-        "womens_jersey": 2922761319,
-        "bike_name": "Cervelo CerveloS52021",
-        "bike_signature": 1972610461,
-        "front_wheel_name": "Reserve Reserve 25 GR",
-        "front_wheel_signature": 635220876,
-        "rear_wheel_name": "Reserve Reserve 25 GR",
-        "rear_wheel_signature": 1842698274,
-        "helmet_name": "LOC_ACCESSORY_LAZERBULLET",
-        "helmet_signature": 1292376041,
-    },
-    "Alpecin - Premier Tech": {
-        "abv": "ADC",
-        "jersey_name": "Alpecin Deceuninck 2023",
-        "jersey_signature": 1905664161,
-        "bike_name": "Canyon Aeroad2024",
-        "bike_signature": 2629993294,
-        "bike_frame_colour_name": "Canyon Aeroad2024-Aeroad Alpecin-Deceuninck",
-        "bike_frame_colour_signature": 1978783051,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-        "helmet_name": "ABUS GameChanger",
-        "helmet_signature": 1387973863,
-    },
-    "Lidl - Trek": {
-        "abv": "TRK",
-        "jersey_name": "Trek-Segafredo Men",
-        "jersey_signature": 2140478849,
-        "womens_jersey_signature": 1154847422,
-        "bike_name": "Trek Madone",
-        "bike_signature": 4129467727,
-        "front_wheel_name": "Bontrager Aeolus5",
-        "front_wheel_signature": 702195190,
-        "rear_wheel_name": "Bontrager Aeolus5",
-        "rear_wheel_signature": 3594144634,
-    },
-    "Movistar Team": {
-        "abv": "MOV",
-        "jersey_name": "Movistar 2023",
-        "jersey_signature": 436926002,
-        "bike_name": "Canyon Aeroad Team Edition",
-        "bike_signature": 390579581,
-        "bike_frame_colour_name": "Canyon Aeroad Team Edition-Movistar 2023",
-        "bike_frame_colour_signature": 2280475316,
-        "front_wheel_name": "Zipp 404",
-        "front_wheel_signature": 613983807,
-        "rear_wheel_name": "Zipp 404",
-        "rear_wheel_signature": 4183014640,
-        "helmet_name": "ABUS GameChanger Movistar Team",
-        "helmet_signature": 4241132751,
-    },
-    "Lotto": {
-        "abv": "LOT",
-        "jersey_name": "Lotto Dstny 2023",
-        "jersey_signature": 712380058,
-        "bike_name": "Ridley Noah Fast 2019",
-        "bike_signature": 4288910569,
-        "bike_frame_colour_name": "Ridley Noah Fast 2019-Lotto Soudal",
-        "bike_frame_colour_signature": 1205664811,
-        "front_wheel_name": "DTSwiss ARC 1100 DICUT 62",
-        "front_wheel_signature": 346409677,
-        "rear_wheel_name": "DTSwiss ARC 1100 DICUT 62",
-        "rear_wheel_signature": 2049111692,
-    },
-    "EF Education - EasyPost": {
-        "abv": "EFE",
-        "jersey_name": "EF Education First",
-        "jersey_signature": 2349035663,
-        "bike_name": "Cannondale System Six",
-        "bike_signature": 2005280203,
-        "bike_frame_colour_name": "Cannondale Super Six Evo-Education First",
-        "bike_frame_colour_signature": 507139888,
-        "front_wheel_name": "HED HED Vanquish RC6 Pro",
-        "front_wheel_signature": 1791179228,
-        "rear_wheel_name": "HED HED Vanquish RC6 Pro",
-        "rear_wheel_signature": 2913819265,
-        "helmet_name": "POC Ventral Air EF",
-        "helmet_signature": 3707571564,
-    },
-    "INEOS Grenadiers": {
-        "abv": "IGD",
-        "jersey_name": "INEOS Grenadiers 2022 Pro",
-        "jersey_signature": 542207259,
-        "bike_name": "Pinarello Dogma F",
-        "bike_signature": 4208139356,
-        "bike_frame_colour_name": "Pinarello Dogma F-Ineos",
-        "bike_frame_colour_signature": 870887764,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-        "helmet_name": "Protone INEOS Grenadier",
-        "helmet_signature": 3438211262,
-    },
-    "Groupama - FDJ United": {
-        "abv": "GFC",
-        "jersey_name": "Groupama FDJ 2023",
-        "jersey_signature": 2814449542,
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-        "helmet_name": "Giro Eclipse FDJ",
-        "helmet_signature": 3912703277,
-    },
-    "Bahrain - Victorious": {
-        "abv": "TBV",
-        "jersey_name": "Bahrain McLaren",
-        "jersey_signature": 2155858980,
-        "bike_frame_colour_name": "Merida Scultura-Merida Scultura Bahrain McLaren",
-        "bike_frame_colour_signature": 2063693653,
-        "bike_name": "Merida Scultura",
-        "bike_signature": 3033010663,
-    },
-    "Team Picnic PostNL": {
-        "abv": "TPP",
-        "jersey_name": "Team ODZ",
-        "jersey_signature": 2695025247,
-        "bike_name": "Scott Foil",
-        "bike_signature": 1315158373,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "Team Jayco AlUla": {
-        "abv": "JAY",
-        "jersey_name": "Team Jayco Alula 2023",
-        "jersey_signature": 91507230,
-        "womens_jersey": 1912060275,
-        "bike_name": "Giant Propel Advanced SL Disc",
-        "bike_signature": 103914490,
-        "front_wheel_name": "Cadex CADEX 42",
-        "front_wheel_signature": 1497226614,
-        "rear_wheel_name": "Cadex CADEX 42",
-        "rear_wheel_signature": 1347687916,
-    },
-    "Uno-X Mobility": {
-        "abv": "UXT",
-        "bike_name": "Ridley Noah Fast 2019",
-        "bike_signature": 4288910569,
-        "jersey_name": "UnoXPro2022",
-        "jersey_signature": 1756517729,
-    },
-    "Cofidis": {
-        "abv": "COF",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Cofidis De Rosa",
-        "bike_frame_colour_signature": 2273815071,
-        "jersey_name": "Cofidis 2018",
-        "jersey_signature": 927604154,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "Intermarché - Wanty": {
-        "abv": "ICW",
-        "jersey_name": "Intermarché Wanty Circus 2023",
-        "jersey_signature": 2642337455,
-        "bike_name": "Cube Cube Litening",
-        "bike_signature": 1767548815,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "Red Bull - BORA - hansgrohe": {
-        "abv": "BOH",
-        "jersey_name": "Bora Hansgrohe",
-        "jersey_signature": 3798832688,
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-        "front_wheel_name": "Roval Rapide CLX",
-        "front_wheel_signature": 2181416413,
-        "rear_wheel_name": "Roval Rapide CLX",
-        "rear_wheel_signature": 3548735686,
-        "helmet_name": "S-Works Evade",
-        "helmet_signature": 3109903878,
-    },
-    "Arkéa - B&B Hotels": {
-        "abv": "ARK",
-        "jersey_name": "Arkea-Samsic",
-        "jersey_signature": 598687666,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "Decathlon CMA CGM Team": {
-        "abv": "ACT",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-AG2R",
-        "bike_frame_colour_signature": 455876950,
-        "jersey_name": "AG2R La Mondiale",
-        "jersey_signature": 1587982785,
-        "front_wheel_name": "Campagnolo Bora Ultra 35",
-        "front_wheel_signature": 1053884173,
-        "rear_wheel_name": "Campagnolo Bora Ultra 35",
-        "rear_wheel_signature": 1614586487,
-    },
-    "XDS Astana Team": {
-        "abv": "XAT",
-        "jersey_name": "ASTANA PRO TEAM",
-        "jersey_signature": 1969335676,
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Astana",
-        "bike_frame_colour_signature": 1208416225,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-        "helmet_name": "Limar Air Speed TWENTY24",
-        "helmet_signature": 9439966,
-    },
-    "Israel - Premier Tech": {
-        "abv": "IPT",
-        "jersey_name": "Israel Premier-Tech",
-        "jersey_signature": 552170906,
-        "bike_name": "Factor One",
-        "bike_signature": 3469325930,
-    },
-    "TotalEnergies": {
-        "abv": "TEN",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Total Direct Energie",
-        "bike_frame_colour_signature": 1215759893,
-        "jersey_name": "Total Direct Energie",
-        "jersey_signature": 2092402045,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "Pinarello Q36.5 Pro Cycling Team": {
-        "abv": "Q36",
-        "bike_name": "Scott Addict RC",
-        "bike_signature": 4100131524,
-        "bike_frame_colour_name": "Scott ScottAddict2021-2022",
-        "bike_frame_colour_signature": 2522283696,
-        "jersey_name": "Q36.5 Pro Team",
-        "jersey_signature": 1185917078,
-        "front_wheel_name": "Zipp 454",
-        "front_wheel_signature": 667389725,
-        "rear_wheel_name": "Zipp 454",
-        "rear_wheel_signature": 461030369,
-    },
-    "Team SD Worx - Protime": {
-        "abv": "SDW",
-        "jersey_name": "Team SD Worx",
-        "jersey_signature": 1494272741,
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-        "helmet_name": "S-Works Evade",
-        "helmet_signature": 3109903878,
-    },
-    "UAE Team ADQ": {
-        "abv": "UAD",
-        "jersey_name": "UAE",
-        "jersey_signature": 1751349769,
-        "bike_name": "Colnago Colnago V3RS",
-        "bike_signature": 3628259811,
-        "front_wheel_name": "Enve SES 3.4",
-        "front_wheel_signature": 2223270801,
-        "rear_wheel_name": "Enve SES 3.4",
-        "rear_wheel_signature": 3835575171,
-    },
-    "UAE Development Team": {
-        "abv": "UDT",
-        "bike_name": "Colnago Colnago V3RS",
-        "bike_signature": 3628259811,
-        "jersey_name": "UAE",
-        "jersey_signature": 1751349769,
-    },
-    "FDJ - SUEZ": {
-        "abv": "FST",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Lapierre FDJ",
-        "bike_frame_colour_signature": 1248651886,
-        "jersey_name": "FDJ Suez 2023",
-        "jersey_signature": 3360845221,
-        "front_wheel_name": "Shimano C50",
-        "front_wheel_signature": 1742598126,
-        "rear_wheel_name": "Shimano C50",
-        "rear_wheel_signature": 3725678091,
-    },
-    "CANYON//SRAM zondacrypto": {
-        "abv": "CSZ",
-        "jersey_name": "CANYON//SRAM Racing",
-        "jersey_signature": 3970245639,
-        "bike_name": "Canyon AeroadSRAM2024",
-        "bike_signature": 1122831861,
-        "front_wheel_name": "Zipp 404",
-        "front_wheel_signature": 613983807,
-        "rear_wheel_name": "Zipp 404",
-        "rear_wheel_signature": 4183014640,
-        "helmet_name": "Giro Eclipse Canyon SRAM",
-        "helmet_signature": 3346861673,
-    },
-    "CANYON//SRAM zondacrypto Generation": {
-        "abv": "CSG",
-        "jersey_name": "Canyon//SRAM Generation",
-        "jersey_signature": 189587516,
-        "bike_name": "Canyon AeroadSRAM2024",
-        "bike_signature": 1122831861,
-        "front_wheel_name": "Zipp 404",
-        "front_wheel_signature": 613983807,
-        "rear_wheel_name": "Zipp 404",
-        "rear_wheel_signature": 4183014640,
-        "helmet_name": "Giro Eclipse Canyon SRAM",
-        "helmet_signature": 3346861673,
-    },
-    "AG Insurance - Soudal Team": {
-        "abv": "AGS",
-        "jersey_name": "Lotto-Soudal",
-        "jersey_signature": 3103938066,
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-        "helmet_name": "S-Works Evade",
-        "helmet_signature": 3109903878,
-    },
-    "Human Powered Health": {
-        "abv": "HPW",
-        "jersey_name": "Human Powered Health Fan",
-        "jersey_signature": 854534852,
-        "bike_name": "Felt AR",
-        "bike_signature": 3002729519,
-    },
-    "Liv AlUla Jayco": {
-        "abv": "LAJ",
-        "jersey_name": "Liv AlUla Jayco 2024",
-        "jersey_signature": 2095486697,
-        "bike_name": "Liv Langma Advanced SL",
-        "bike_signature": 3495124341,
-    },
-    "Roland Le Dévoluy": {
-        "abv": "CGS",
-        "jersey_name": "Team Roland Cogeas Edelweiss",
-        "jersey_signature": 3398931495,
-        "bike_name": "Factor One",
-        "bike_signature": 3469325930,
-        "bike_frame_colour_name": "Factor One-One Israel",
-        "bike_frame_colour_signature": 3959514452,
-        "helmet_name": "Limar Air Speed TWENTY24",
-        "helmet_signature": 9439966,
-    },
-    "Fenix-Deceuninck": {
-        "abv": "FDC",
-        "jersey_name": "Fenix Deceuninck 2023",
-        "jersey_signature": 3290712389,
-        "bike_name": "Canyon Aeroad2024",
-        "bike_signature": 2629993294,
-    },
-    "Fenix-Deceuninck Development Team": {
-        "abv": "FDD",
-        "bike_name": "Canyon Aeroad2024",
-        "bike_signature": 2629993294,
-        "jersey_name": "Fenix Deceuninck 2023",
-        "jersey_signature": 3290712389,
-    },
-    "CERATIZIT Pro Cycling Team": {
-        "abv": "CTC",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Orbea Orca",
-        "bike_frame_colour_signature": 806402273,
-        "jersey_name": "Ceratizit-WNT",
-        "jersey_signature": 97975537,
-    },
-    "St Michel - Preference Home - Auber93 WE": {
-        "abv": "AUB",
-        "jersey_name": "South Africa Elite",
-        "jersey_signature": 3305515323,
-        "bike_name": "Cannondale System Six",
-        "bike_signature": 2005280203,
-        "front_wheel_name": "Mavic Comete Pro Carbon SL UST",
-        "front_wheel_signature": 897949453,
-        "rear_wheel_name": "Mavic Comete Pro Carbon SL UST",
-        "rear_wheel_signature": 4001596344,
-    },
-    "Cofidis Women Team": {
-        "abv": "CWT",
-        "bike_name": "Zwift Carbon",
-        "bike_signature": 2106340733,
-        "bike_frame_colour_name": "Zwift Carbon-Cofidis De Rosa",
-        "bike_frame_colour_signature": 2273815071,
-        "jersey_name": "Cofidis",
-        "jersey_signature": 4191972189,
-    },
-    "Arkéa - B&B Hotels Women": {
-        "abv": "ARKW",
-        "jersey_name": "Arkea",
-        "jersey_signature": 1128201030,
-    },
-    "MAT Atom Deweloper Wrocław": {
-        "abv": "MAT",
-        "bike_name": "Ridley Noah Fast 2019",
-        "bike_signature": 4288910569,
-        "jersey_name": "Atom Racing Team",
-        "jersey_signature": 851470392,
-    },
-    "Top Girls Fassa Bortolo": {
-        "abv": "TOP",
-        "bike_name": "Pinarello Dogma F",
-        "bike_signature": 4208139356,
-        "jersey_name": "Clash Of Clubs Blue",
-        "jersey_signature": 520081294,
-    },
-    "Team Polti VisitMalta": {
-        "abv": "PTV",
-        "jersey_name": "Eolo Kometa",
-        "jersey_signature": 2422819298,
-        "front_wheel_name": "Enve SES 3.4",
-        "front_wheel_signature": 2223270801,
-        "rear_wheel_name": "Enve SES 3.4",
-        "rear_wheel_signature": 3835575171,
-    },
-    "VF Group - Bardiani CSF - Faizanè": {
-        "abv": "VBF",
-        "jersey_name": "Bardiani 2019",
-        "jersey_signature": 3503002798,
-        "front_wheel_name": "Campagnolo Bora Ultra 35",
-        "front_wheel_signature": 1053884173,
-        "rear_wheel_name": "Campagnolo Bora Ultra 35",
-        "rear_wheel_signature": 1614586487,
-    },
-    "L39ION of Los Angeles": {
-        "abv": "LLA",
-        "bike_name": "Factor One",
-        "bike_signature": 3469325930,
-        "jersey_name": "L39ION of LA 2022",
-        "jersey_signature": 2330819669,
-    },
-    "Lotto Ladies": {
-        "abv": "LOL",
-        "jersey_name": "Lotto Dstny 2023",
-        "jersey_signature": 712380058,
-    },
-    "Parkhotel Valkenburg": {
-        "abv": "PHV",
-        "bike_name": "Giant Propel Advanced SL Disc",
-        "bike_signature": 103914490,
-        "jersey_name": "Parkhotel Valkenburg",
-        "jersey_signature": 4102459937,
-    },
-    "Tudor Pro Cycling Team": {
-        "abv": "TUD",
-        "jersey_name": "Assos Superleger",
-        "jersey_signature": 142676981,
-        "bike_name": "BMC TeamMachine",
-        "bike_signature": 3868468027,
-        "bike_frame_colour_name": "BMC Timemachine01-BMC Timemachine01 Black",
-        "bike_frame_colour_signature": 2850354759,
-        "front_wheel_name": "DTSwiss ARC 1100 DICUT 85/Disc",
-        "front_wheel_signature": 1213183664,
-        "rear_wheel_name": "DTSwiss ARC 1100 DICUT 85/Disc",
-        "rear_wheel_signature": 590647095,
-    },
-    "EF Education-Oatly": {
-        "abv": "EFO",
-        "jersey_name": "EF Education First",
-        "jersey_signature": 2349035663,
-        "bike_name": "Cannondale System Six",
-        "bike_signature": 2005280203,
-    },
-    "Roland": {
-        "abv": "ROL",
-        "bike_name": "Pinarello Dogma F",
-        "bike_signature": 4208139356,
-    },
-    "NSN Cycling Team": {"abv": "NSN"},
-    'VolkerWessels Women"s Pro Cycling Team': {
-        "abv": "VWT",
-        "bike_name": "Specialized Tarmac SL7",
-        "bike_signature": 935373427,
-    },
-}
+TEAMS_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "get_pro_names.json"
+)
+with open(TEAMS_FILE, encoding="utf-8") as _tf:
+    teams = json.load(_tf)
 
-# 2026 season team-name aliases (procyclingstats display names)
-teams["Netcompany INEOS"] = teams["INEOS Grenadiers"]
-teams["Lotto Intermarché"] = teams["Intermarché - Wanty"]
-teams["Fenix-Premier Tech"] = teams["Fenix-Deceuninck"]
-teams["FDJ United - SUEZ"] = teams["FDJ - SUEZ"]
-teams["UAE Team L'IMAD"] = teams["UAE Development Team"]
-teams["VolkerWessels Cycling Team"] = {"abv": "VWC"}
 
 MATCH_THRESHOLD = 85
+
+
+TEAM_STOPWORDS = {
+    "team",
+    "cycling",
+    "pro",
+    "men",
+    "women",
+    "racing",
+    "continental",
+    "academy",
+    "dev",
+    "development",
+    "u23",
+    "world",
+    "tour",
+    "elite",
+    "equipe",
+    "junior",
+}
 
 
 def normalize_team(name):
@@ -731,6 +248,210 @@ jerseys = {}
 for x in tree.findall("./JERSEYS/JERSEY"):
     jerseys[x.get("name")] = int(x.get("signature"))
 
+bikes = {}
+front_wheels = {}
+rear_wheels = {}
+helmets = {}
+shoes = {}
+paintjobs = {}
+for x in tree.findall("./BIKEFRAMES/BIKEFRAME"):
+    bikes[x.get("name")] = int(x.get("signature"))
+for x in tree.findall("./BIKEFRONTWHEELS/BIKEFRONTWHEEL"):
+    front_wheels[x.get("name")] = int(x.get("signature"))
+for x in tree.findall("./BIKEREARWHEELS/BIKEREARWHEEL"):
+    rear_wheels[x.get("name")] = int(x.get("signature"))
+for x in tree.findall("./HEADGEARS/HEADGEAR"):
+    helmets[x.get("name")] = int(x.get("signature"))
+for x in tree.findall("./BIKESHOES/BIKESHOE"):
+    shoes[x.get("name")] = int(x.get("signature"))
+for x in tree.findall("./PAINTJOBS/PAINTJOB"):
+    paintjobs[x.get("name")] = int(x.get("signature"))
+
+
+def best_match(query, choices):
+    if not query or not choices:
+        return None, 0
+    best = process.extractOne(query, list(choices.keys()), scorer=fuzz.token_set_ratio)
+    if best:
+        return best[0], best[1]
+    return None, 0
+
+
+def resolve_paintjob(team_name, bike_brand):
+    tnorm = normalize_team(team_name)
+    bnorm = normalize_team(bike_brand) if bike_brand else ""
+    tokens = [t for t in tnorm.split() if len(t) > 2 and t not in TEAM_STOPWORDS]
+    preferred = None
+    fallback = None
+    for name, sig in paintjobs.items():
+        if "-" not in name:
+            continue
+        raw_model, raw_suffix = name.split("-", 1)
+        model = normalize_team(raw_model)
+        suffix = normalize_team(raw_suffix)
+        if not any(t in suffix.split() for t in tokens):
+            continue
+        if bnorm and model.split()[0] == bnorm.split()[0]:
+            preferred = (name, sig, raw_model)
+        elif fallback is None:
+            fallback = (name, sig, raw_model)
+    if preferred:
+        return preferred[0], preferred[1], preferred[2], True
+    if fallback:
+        return fallback[0], fallback[1], fallback[2], False
+    return None, 0, None, False
+
+
+def parse_gear(team_href):
+    slug = team_href.rstrip("/").split("/")[-1]
+    url = "https://www.procyclingstats.com/team/%s/more/gear" % slug
+    gear = {}
+    try:
+        soup = BeautifulSoup(fetch_html(url), "html.parser")
+        for li in soup.find_all("li"):
+            parts = [s.strip() for s in li.stripped_strings]
+            if len(parts) >= 2:
+                label = parts[0].rstrip(":").lower()
+                brand = parts[1]
+                if label == "bike":
+                    gear["bike"] = brand
+                elif label == "helmets":
+                    gear["helmet"] = brand
+                elif label == "shoes":
+                    gear["shoe"] = brand
+                elif label == "wheels":
+                    gear["wheel"] = brand
+    except Exception as e:
+        print("GEAR FETCH FAILED: %s (%s)" % (url, e))
+    return gear
+
+
+def fetch_team_rankings(limit):
+    pages = [
+        "https://www.procyclingstats.com/rankings/teams",
+        "https://www.procyclingstats.com/rankings/we/teams",
+    ]
+    found = []
+    seen = set()
+    for base in pages:
+        offset = 0
+        while len(found) < limit:
+            url = base if offset == 0 else "%s&offset=%d" % (base, offset)
+            try:
+                soup = BeautifulSoup(fetch_html(url), "html.parser")
+            except Exception as e:
+                print("RANKINGS FETCH FAILED: %s (%s)" % (url, e))
+                break
+            links = soup.select("a[href^='team/']")
+            got = False
+            for a in links:
+                h = a.get("href")
+                href = h if isinstance(h, str) else ""
+                if href in seen or not href.startswith("team/"):
+                    continue
+                name = a.get_text(strip=True)
+                if not name:
+                    continue
+                seen.add(href)
+                found.append((name, href))
+                got = True
+                if len(found) >= limit:
+                    break
+            if not got:
+                break
+            offset += 100
+    return found[:limit]
+
+
+def generate_teams(limit):
+    results = {}
+    for team_name, href in fetch_team_rankings(limit):
+        entry = {}
+        jname, jscore = best_match(team_name, jerseys)
+        if jname and jscore >= MATCH_THRESHOLD:
+            print("JERSEY: %r -> %r (score %d)" % (team_name, jname, jscore))
+            entry["jersey_name"] = jname
+            entry["jersey_signature"] = jerseys[jname]
+        else:
+            print(
+                "UNMATCHED JERSEY: %r (best %r score %d)" % (team_name, jname, jscore)
+            )
+
+        gear = parse_gear(href)
+        brand = gear.get("bike")
+
+        pjname, pjsig, model, ok = resolve_paintjob(team_name, brand)
+        if pjname and ok:
+            print("PAINTJOB: %r -> %r (model %r)" % (team_name, pjname, model))
+            entry["bike_frame_colour_name"] = pjname
+            entry["bike_frame_colour_signature"] = pjsig
+            if model:
+                bname, bscore = best_match(model, bikes)
+                if bname and bscore >= MATCH_THRESHOLD:
+                    print("BIKE (paintjob model): %r -> %r" % (model, bname))
+                    entry["bike_name"] = bname
+                    entry["bike_signature"] = bikes[bname]
+                else:
+                    entry["bike_name"] = model
+                    entry["bike_signature"] = bikes.get(model, 0)
+        else:
+            if pjname:
+                print(
+                    "PAINTJOB (brand mismatch, ignored): %r -> %r" % (team_name, pjname)
+                )
+            if brand:
+                bname, bscore = best_match(brand, bikes)
+                if bname and bscore >= MATCH_THRESHOLD:
+                    print("FUZZY BIKE: %r -> %r (score %d)" % (brand, bname, bscore))
+                    entry["bike_name"] = bname
+                    entry["bike_signature"] = bikes[bname]
+                else:
+                    print(
+                        "UNMATCHED BIKE: %r (best %r score %d)" % (brand, bname, bscore)
+                    )
+            else:
+                print("NO GEAR BIKE: %r" % team_name)
+
+        if gear.get("wheel"):
+            wname, wscore = best_match(gear["wheel"], front_wheels)
+            if wname and wscore >= MATCH_THRESHOLD:
+                print("FUZZY FRONT WHEEL: %r -> %r" % (gear["wheel"], wname))
+                entry["front_wheel_name"] = wname
+                entry["front_wheel_signature"] = front_wheels[wname]
+            else:
+                print("UNMATCHED FRONT WHEEL: %r" % gear["wheel"])
+            wname2, wscore2 = best_match(gear["wheel"], rear_wheels)
+            if wname2 and wscore2 >= MATCH_THRESHOLD:
+                print("FUZZY REAR WHEEL: %r -> %r" % (gear["wheel"], wname2))
+                entry["rear_wheel_name"] = wname2
+                entry["rear_wheel_signature"] = rear_wheels[wname2]
+            else:
+                print("UNMATCHED REAR WHEEL: %r" % gear["wheel"])
+
+        if gear.get("helmet"):
+            hname, hscore = best_match(gear["helmet"], helmets)
+            if hname and hscore >= MATCH_THRESHOLD:
+                print("FUZZY HELMET: %r -> %r" % (gear["helmet"], hname))
+                entry["helmet_name"] = hname
+                entry["helmet_signature"] = helmets[hname]
+            else:
+                print("UNMATCHED HELMET: %r" % gear["helmet"])
+
+        if gear.get("shoe"):
+            sname, sscore = best_match(gear["shoe"], shoes)
+            if sname and sscore >= MATCH_THRESHOLD:
+                print("FUZZY SHOE: %r -> %r" % (gear["shoe"], sname))
+                entry["shoe_name"] = sname
+                entry["shoe_signature"] = shoes[sname]
+            else:
+                print("UNMATCHED SHOE: %r" % gear["shoe"])
+
+        results[team_name] = entry
+
+    with open(TEAMS_FILE, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    print("WROTE %d teams to %s" % (len(results), TEAMS_FILE))
+
 
 def main(argv):
     global args
@@ -784,7 +505,23 @@ def main(argv):
         default=MATCH_THRESHOLD,
         type=int,
     )
+    parser.add_argument(
+        "--generate-teams",
+        help="Auto-build get_pro_names.json from top-ranked procyclingstats teams",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "--team-limit",
+        help="Number of ranked teams to include when generating",
+        default=100,
+        type=int,
+    )
     args = parser.parse_args()
+
+    if args.generate_teams:
+        generate_teams(args.team_limit)
+        return
     url_additions = ""
     url_list = []
     if args.alltime:

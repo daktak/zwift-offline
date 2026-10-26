@@ -2272,6 +2272,12 @@ def api_search_profiles():
 def api_profiles_membership_status(player_id):
     return jsonify({"status":"active"}) # {"title":"25km","description":"renews.1677628800000","status":"active","upcoming":null,"subscription":null,"promotions":[],"hasStackedPromos":false,"startedPortability":false,"grandfathered":false,"grandfatheringGroup":null,"freeTrialKmLeft":18}
 
+@app.route('/api/membership/profiles/me/feature-gate-access', methods=['GET'])
+@jwt_to_session_cookie
+@login_required
+def api_membership_feature_gate_access():
+    return jsonify({"access": True, "entitled": True, "granted": True})
+
 @app.route('/api/profiles/<int:player_id>/statistics', methods=['GET'])
 def api_profiles_id_statistics(player_id):
     from_dt = request.args.get('startDateTime')

@@ -418,6 +418,8 @@ def get_route_name(state):
         routes = get_routes()
     if state.route in routes:
         return routes[state.route]['name']
+    if zo.get_course(state) == 18:
+        print('video route not found: course=%s route=%s f19=%s' % (zo.get_course(state), state.route, state.f19))
     return zo.courses_lookup.get(zo.get_course(state), 'Zwift')
 
 def load_ghosts_folder(folder, ghosts):
@@ -659,7 +661,10 @@ class UDPHandler(socketserver.BaseRequestHandler):
                 if online[player_id].worldTime > state.worldTime:
                     return #udp is unordered -> drop old state
                 online[player_id] = state
-            elif zo.world_time() < state.worldTime + 10000:
+            else:
+                # Announce new riders even if their worldTime is not aligned with
+                # the server clock (e.g. Zwift Video / Mochi routes), so that they
+                # still show up in Discord.
                 online[player_id] = state
                 discord.change_presence(len(online))
                 if discord.announce:

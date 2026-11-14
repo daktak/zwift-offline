@@ -442,7 +442,7 @@ To enable support for IPv6 set the environment variable ``ZOFFLINE_SERVER_HOST``
 * Matrix commands are ``!online``, ``!ping`` and ``!help``. Other room messages are
   relayed to in-game chat, and in-game chat is relayed to the room.
 * The Matrix bridge requires Python 3.10 or newer.
-* Encrypted rooms are supported by ``matrix-nio[e2e]``.
+* Encrypted rooms are supported by ``matrix-nio[e2e]`` (installed with the requirements).
   Other Matrix clients must share the room keys with the bot device. The bridge does not
   support cross-signing or key backup, so clients that require cross-signed devices may
   need to be configured to allow sharing keys with the bot.
@@ -474,7 +474,7 @@ Docker
 * stravalib (https://stravalib.readthedocs.io/)
 * OPTIONAL: garth (https://pypi.org/project/garth/)
 * OPTIONAL: discord.py (https://discordpy.readthedocs.io/)
-* OPTIONAL: matrix-nio (https://matrix-nio.readthedocs.io/)
+* OPTIONAL: matrix-nio[e2e] for the Matrix bridge (https://matrix-nio.readthedocs.io/)
 
 
 ## Note

@@ -32,6 +32,7 @@ else:
     STORAGE_DIR = "%s/storage" % SCRIPT_DIR
 
 CDN_DIR = "%s/cdn" % SCRIPT_DIR
+CDN_IMAGES_DIR = "%s/cdn/static" % STORAGE_DIR
 CDN_PROXY = os.path.isfile('%s/cdn-proxy.txt' % STORAGE_DIR)
 if not CDN_PROXY and not os.path.isfile('%s/disable_proxy.txt' % STORAGE_DIR):
     # If CDN proxy is disabled, try to resolve zwift.com using Google public DNS
@@ -138,6 +139,10 @@ class CDNHandler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         path = SimpleHTTPRequestHandler.translate_path(self, path)
         relpath = os.path.relpath(path, os.getcwd())
+        if relpath.startswith('static' + os.sep):
+            imagepath = os.path.join(CDN_IMAGES_DIR, relpath[len('static') + 1:])
+            if os.path.isfile(imagepath):
+                return imagepath
         fullpath = os.path.join(CDN_DIR, relpath)
         return fullpath
 

@@ -31,7 +31,7 @@ from gevent.pywsgi import WSGIServer
 from gevent import ssl
 from google.protobuf.json_format import MessageToDict, Parse
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.utils import secure_filename
+from werkzeug.utils import safe_join, secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -100,6 +100,7 @@ if not make_dir(STORAGE_DIR):
     sys.exit(1)
 
 SSL_DIR = "%s/ssl" % SCRIPT_DIR
+CDN_IMAGES_DIR = "%s/cdn/static" % STORAGE_DIR
 DATABASE_PATH = "%s/zwift-offline.db" % STORAGE_DIR
 DATABASE_CUR_VER = 3
 ZWIFT_VER_CUR = ET.parse('%s/cdn/gameassets/Zwift_Updates_Root/Zwift_ver_cur.xml' % SCRIPT_DIR).getroot().get('sversion')
@@ -146,7 +147,17 @@ warnings.simplefilter("ignore")
 
 from tokens import *
 
-app = Flask(__name__, static_folder='%s/cdn/static' % SCRIPT_DIR, template_folder='%s/cdn/static/web/launcher' % SCRIPT_DIR)
+class ZofflineFlask(Flask):
+    def send_static_file(self, filename):
+        # Companion images downloaded by scripts/get_zca_images.py take precedence
+        # over the bundled cdn/static files.
+        image = safe_join(CDN_IMAGES_DIR, filename)
+        if image and os.path.isfile(image):
+            return send_from_directory(CDN_IMAGES_DIR, filename, conditional=True)
+        return super().send_static_file(filename)
+
+
+app = ZofflineFlask(__name__, static_folder='%s/cdn/static' % SCRIPT_DIR, template_folder='%s/cdn/static/web/launcher' % SCRIPT_DIR)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///{db}'.format(db=DATABASE_PATH)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 if not os.path.exists(SECRET_KEY_FILE):

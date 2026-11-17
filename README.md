@@ -257,14 +257,16 @@ To obtain your current profile:
 
 <details><summary>Android (non-rooted device)</summary>
 
+* On the machine running zoffline, run ``scripts/get_zca_images.py`` once while ``cdn.zwift.com`` still resolves to the official server (i.e. before adding it to any hosts file). This downloads the images used by Companion into ``storage/cdn/static``. Re-run it after updating ``data/game_info.txt`` or the Companion app. See ``python3 scripts/get_zca_images.py --help`` for options.
+* Install ``ssl/cert-zwift-com.pem`` on the Android device as a trusted CA (Android Settings - Security - Install from storage), otherwise Companion cannot load the images over HTTPS from zoffline.
 * Download and install the patched apk from [here](https://github.com/fatsbrown/zoffline-companion/releases/latest) (or [patch it yourself](https://github.com/fatsbrown/zoffline-companion#patch-it-yourself))
 * Download and install ``app-Github-release.apk`` from [here](https://github.com/x-falcon/Virtual-Hosts/releases/latest)
 * Create a ``hosts.txt`` file to use with the app (you could use a text editor app or create it online with an online tool such as [this](https://passwordsgenerator.net/text-editor/)). The file must look like this (replace ``<zoffline ip>`` with the IP address of the machine running zoffline):
   ```
   <zoffline ip> us-or-rly101.zwift.com
   <zoffline ip> secure.zwift.com
+  <zoffline ip> cdn.zwift.com
   ```
-  * Important: don't add ``cdn.zwift.com`` to ``hosts.txt``, Companion needs to download images from the official server
 * Turn off "Private DNS" in Android settings
 * Run "Virtual Hosts" and select the created ``hosts.txt`` file
 * Optionally, instead of using the "Virtual Hosts" app, you can create a ``fake-dns.txt`` file in the ``storage`` directory and set the "DNS 1" of your phone Wi-Fi connection to the IP address of the PC running zoffline
@@ -402,6 +404,7 @@ To enable support for IPv6 set the environment variable ``ZOFFLINE_SERVER_HOST``
 * To obtain the official map schedule and update files from Zwift server: create a ``cdn-proxy.txt`` file in the ``storage`` directory. This can only work if you are running zoffline on a different machine than the Zwift client.
 * By default, zoffline will try to proxy using Google public DNS to resolve Zwift host names, this should work even if zoffline is running on the same machine as the Zwift client. To avoid it, create a ``disable_proxy.txt`` file in the ``storage`` directory.
 * If you want to serve update files from zoffline, run the script ``get_gameassets.py`` to download the game files.
+* Images for the Companion app are downloaded by ``scripts/get_zca_images.py`` into ``storage/cdn/static`` and are served locally over both HTTP and HTTPS. Run the script before redirecting ``cdn.zwift.com`` to zoffline.
 </details>
 
 <details><summary>Discord bridge</summary>
